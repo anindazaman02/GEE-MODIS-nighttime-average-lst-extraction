@@ -1,0 +1,57 @@
+// Import shapefile as AOI
+
+var aoi = ee.FeatureCollection('projects/ee-zaman02/assets/Urban_Areas_2000');
+Map.centerObject(aoi, 10);
+
+
+// Load MODIS Nighttime LST data for 2024
+
+// Using MYD11A2 (Aqua) for the 1:30 AM overpass. 
+var modisNightLST_2024 = ee.ImageCollection('MODIS/061/MYD11A2')
+  .filterDate('2024-03-01', '2024-05-31')
+  .filterBounds(aoi)
+  .select('LST_Night_1km') // Specifically selecting the nighttime band
+  .map(function(img) {
+    return img.multiply(0.02).subtract(273.15)
+              .copyProperties(img, ['system:time_start']);
+  });
+
+
+// Calculate seasonal mean Nighttime LST
+
+var summerNightLST_2024 = modisNightLST_2024.mean().clip(aoi);
+
+
+// Visualize the average Nighttime LST
+
+// Adjusted visualization min/max because nights are cooler than days
+var visParamsNight = {
+  min: 15, // Adjusted minimum for night
+  max: 30, // Adjusted maximum for night
+  palette: ['blue', 'yellow', 'red']
+};
+Map.addLayer(summerNightLST_2024, visParamsNight, 'Avg Night LST (Mar–May 2024)');
+
+
+// Export Nighttime LST raster as GeoTIFF
+
+// Export.image.toDrive({
+//   image: summerNightLST_2024,
+//   description: 'Avg_Night_LST_Summer_2024',
+//   folder: 'GEE_Exports',
+//   fileNamePrefix: 'Night_LST_Summer_2024_',
+//   region: aoi.geometry(),
+//   scale: 1000,
+//   maxPixels: 1e13
+// });
+
+
+// Optional - Print average Nighttime LST value
+
+var stats_Night_2024 = summerNightLST_2024.reduceRegion({
+  reducer: ee.Reducer.mean(),
+  geometry: aoi,
+  scale: 1000,
+  maxPixels: 1e13
+});
+print('Average Summer Nighttime LST in 2024 (°C):', stats_Night_2024);
